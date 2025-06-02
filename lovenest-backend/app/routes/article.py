@@ -1,7 +1,10 @@
 from pydantic import BaseModel
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from app.services.db import articles_collection
+from bson.objectid import ObjectId
+
+from app.utils.auth_handler import get_current_user 
 
 class GenerateArticleRequest(BaseModel):
     keyword: str
@@ -56,3 +59,60 @@ def generate_article(request: GenerateArticleRequest):
         "meta_title": meta_title,
         "article": article
     }
+
+@router.get("/article-history")
+def article_history():
+    username = "test_user"      # For now, hardcoded user
+
+    # Query last 5 articles (newest first)
+    articles = (
+        articles_collection.find({"username": username})
+        .sort("created_at", -1)
+        .limit(5)
+    )
+
+    result = []
+    for index, article in enumerate(articles, start = 1):
+        result.append({
+            "serial_number": index,
+            "id": str(article["_id"]),
+            "meta_title": article.get("meta_title", ""),
+            "created_at": article.get("created_at")
+        })
+    
+    return result
+
+@router.get("/view/{article_id}")
+def view_article(article_id: str):
+    article = articles_collection.find_one({"_id": ObjectId(article_id)})
+
+    if not article:
+        raise HTTPException(status_code = 404, detail = "Article not found")
+    
+    return {
+        "meta_title": article["meta_title"],
+        "keyword": article["keyword"],
+        "article": article["article"],
+        "created_at": article["created_at"]
+    }
+
+@router.get("/download/{article_id}")
+def download_article(article_id: str):
+    article = articles_collection.find_one({"_id": ObjectId(article_id)})
+
+    if not article:
+        raise HTTPException(status_code = 404, detail = "Article not found")
+    
+    return {
+        "filename": f"{article["meta_title"].replace(' ', '_')}.txt",
+        "content": article["article"]
+    }
+
+@router.delete("/delete/{article_id}")
+def delete_article(article_id: str):
+    result = articles_collection.delete_one({"_id": ObjectId(article_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Article not found or already deleted")
+    
+    return { "Message": "Article deleted successfully"}

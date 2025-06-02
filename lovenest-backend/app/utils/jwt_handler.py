@@ -13,7 +13,7 @@ def create_access_token(data: dict, expires_in: int=30):
     :param expires_in: Token expiry in minutes
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_in)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_in) #timedelta holds the duration in days, hours, minutes etc.
     to_encode.update({"exp": expire})
 
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
